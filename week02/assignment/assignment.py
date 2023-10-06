@@ -56,7 +56,28 @@ call_count = 0
 # TODO Add your threaded class definition here
 
 
-# TODO Add any functions you need here
+class RequestThread(threading.Thread):
+    
+
+    def __init__(self, url):
+        # calling parent class constructor
+        super().__init__()
+
+        self.url = url
+
+        self.response = {}
+
+        
+
+       
+
+    # TODO Add any functions you need here
+    
+    def run(self):
+        self.response = requests.get(self.url)
+
+
+
 
 
 def main():
@@ -65,7 +86,19 @@ def main():
 
     # TODO Retrieve Top API urls
 
+    urls = requests.get(TOP_API_URL)
+
+    response_data = urls.json()
+
+    print(response_data["people"])
+
+
+
     # TODO Retireve Details on film 6
+
+    t1 = RequestThread(response_data["people"])
+
+    print(t1.response)
 
     # TODO Display results
 
