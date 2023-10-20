@@ -10,6 +10,7 @@ Instructions:
 
 import random
 import multiprocessing as mp
+from multiprocessing import Value
 import os.path
 import time
 import datetime
@@ -146,12 +147,13 @@ class Assembler(mp.Process):
         Sends the completed gift to the wrapper """
     marble_names = ('Lucky', 'Spinner', 'Sure Shot', 'Big Joe', 'Winner', '5-Star', 'Hercules', 'Apollo', 'Zeus')
 
-    def __init__(self, rec_conn, send_conn, delay):
+    def __init__(self, rec_conn, send_conn, delay, count):
         mp.Process.__init__(self)
         # TODO Add any arguments and variables here
         self.rec_conn = rec_conn
         self.send_conn = send_conn
         self.delay = delay
+        self.count = count
 
     def run(self):
         '''
@@ -170,6 +172,7 @@ class Assembler(mp.Process):
                 return
             large_marble = random.choice(self.marble_names)
             gift = Gift(large_marble, marble_bag)
+            self.count.value += 1
             self.send_conn.send(gift)
             time.sleep(self.delay)
 
@@ -254,6 +257,8 @@ def main():
 
     # TODO create variable to be used to count the number of gifts
 
+    gift_count = Value('i', 0)
+
     # delete final boxes file
     if os.path.exists(BOXES_FILENAME):
         os.remove(BOXES_FILENAME)
@@ -266,7 +271,7 @@ def main():
 
     bagg_pro = Bagger(bag_rec_con, bag_send_con, marble_per_bag, bagger_delay)
 
-    assem_pro = Assembler(as_rec_con, as_send_con, assembler_delay)
+    assem_pro = Assembler(as_rec_con, as_send_con, assembler_delay, gift_count)
 
     wrapp_pro = Wrapper(wra_rec_con, wrapper_delay)
 
@@ -293,7 +298,7 @@ def main():
     
     # TODO Log the number of gifts created.
 
-
+    log.write(gift_count.value)
 
 
 if __name__ == '__main__':
