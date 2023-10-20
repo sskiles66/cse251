@@ -2,7 +2,7 @@
 Course: CSE 251
 Lesson Week: 05
 File: assignment.py
-Author: <Your name>
+Author: Stephen Skiles
 
 Purpose: Assignment 05 - Factories and Dealers
 
@@ -18,6 +18,9 @@ Instructions:
 - You are not allowed to use the normal Python Queue object.  You must use Queue251.
 - the shared queue between the threads that are used to hold the Car objects
   can not be greater than MAX_QUEUE_SIZE
+
+I believe that my work on this assignment is a 4/4 because my program meets all of the requirements. The Factory and Dealeship class are
+running in parallel and are returning the factory and dealer stats to a log.
 
 """
 
@@ -121,23 +124,18 @@ class Factory(threading.Thread):
         # TODO wait until all of the factories are finished producing cars
         self.barrier.wait()
 
-        self.lock.acquire()
+        #self.lock.acquire()
 
         for _ in range(self.count):
             self.fac_sem.release()
 
         # TODO "Wake up/signal" the dealerships one more time.  Select one factory to do this
-        #print("hhghghghghg")
+
         self.queue.put("stop")
 
-        self.lock.release()
+        #self.lock.release()
 
         return
-        #time.sleep(1)
-        #print(list(self.queue))
-        
-        #self.del_sem.acquire()
-
 
 
 
@@ -157,24 +155,13 @@ class Dealer(threading.Thread):
         while True:
             # TODO handle a car
             self.fac_sem.acquire()
-            #time.sleep(0.15)
-            #print(len(self.queue.items))
-            #self.lock.acquire()
             car = self.queue.get()
             self.stats[self.i] += 1
             print(f"dealer{self.stats[self.i]}")
-            #self.lock.release()
-            #print(len(self.queue.items))
-            #print(car)
             if car == "stop":
                 self.stats[self.i] -= 1
                 self.queue.put("stop")
-                #self.del_sem.acquire()
-                #time.sleep(1)
-                print("supppoosde to breakksfkapks")
-                
-                #time.sleep(1)
-                #self.fac_sem.release()
+                #print("supppoosde to breakksfkapks")
                 return
             
             self.del_sem.release()
@@ -191,11 +178,18 @@ def run_production(factory_count, dealer_count):
     """
 
     # TODO Create semaphore(s) if needed
-    dealer_sem = threading.Semaphore(8)
+
+    dealer_sem = threading.Semaphore(MAX_QUEUE_SIZE)
     factory_sem = threading.Semaphore(0)
+
     # TODO Create queue
+
     car_queue = Queue251()
+
     # TODO Create lock(s) if needed
+
+    lock = threading.Lock()
+
     # TODO Create barrier
     barrier = threading.Barrier(factory_count)
 
@@ -203,8 +197,6 @@ def run_production(factory_count, dealer_count):
     dealer_stats = list([factory_count] * dealer_count)
 
     factory_stats = list([dealer_count] * factory_count)
-
-    lock = threading.Lock()
 
     # TODO create your factories, each factory will create CARS_TO_CREATE_PER_FACTORY
 
