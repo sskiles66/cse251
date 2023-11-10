@@ -77,100 +77,68 @@ def get_color():
 
 
 def solve_find_end(maze: Maze):
-    """finds the end position using threads.  Nothing is returned"""
-    # When one of the threads finds the end position, stop all of them
+    """Finds the end position using threads. Nothing is returned."""
+
     global stop
     stop = False
 
-    cond = threading.Condition()
-
-    def backtrack(x, y, color):
-        """Recursively backtracks through the maze, creating new threads for each new direction"""
-        # Base case: If we've reached the end position, return True.
-        # color = get_color()
-
-        with cond:
-            if maze.at_end(x, y) == True:
-                print("found end at:", x, y)
-
-                # Set the stop flag to True to stop all threads
-                global stop
-                stop = True
-
-                # Only notify threads that haven't found the end yet
-                cond.notify_all()
-
-                return True
-
-        # Check if the stop flag is set before proceeding with the recursive call.
-        if stop:
-            return True
-
-        # Get all possible moves from the current position.
-        possible_moves = maze.get_possible_moves(x, y)
-
-        # Create a list to store the threads
-        threads = []
+    def backtrack(x, y, color, cond):
         
+        for next_x, next_y in maze.get_possible_moves(x,y):
+            if len(maze.get_possible_moves(x, y)) > 1:
+                # print(f"lengt of possible: {len(maze.get_possible_moves(x, y))}")
+                for i, (next_x, next_y) in enumerate(maze.get_possible_moves(x,y)):
+                    if i > 0:
+                        color = get_color()
+                        t = threading.Thread(target=backtrack, args=(x, y, color, cond))
+                        threads.append(t)
+                        global thread_count
+                        thread_count += 1
+                        t.start()
+                    else:
+                        if maze.can_move_here(next_x, next_y):
+                            maze.move(next_x, next_y, color)
+                        backtrack(next_x, next_y, color, cond)
 
-        for next_x, next_y in possible_moves:
-            # Mark the current position as visited.
-            if len(possible_moves) > 1:
-
-                color = get_color()
-            
             if maze.can_move_here(next_x, next_y):
                 maze.move(next_x, next_y, color)
-                
-            
-            thread = threading.Thread(
-                    target=backtrack, args=(next_x, next_y, color)
-                )
-            thread.start()
-            threads.append(thread)
-            global thread_count
-            thread_count += 1
-            print(f"length of threads {thread_count}")
-            
-
-            
-        # Check the stop flag before waiting for all threads to finish.
-        if stop:
-            return True
-
-        
-        # Wait for all threads to finish before continuing.
-        for thread in threads:
-            thread.join()
-
-        
-
-        # If a thread found the end, set the stop flag and return True.
-        with cond:
+                        
+            with cond:
+                if maze.at_end(next_x, next_y) == True:
+                    print("found end at:", x, y)
+                    global stop
+                    stop = True
+                    cond.notify_all()
+                    return True
             if stop:
                 return True
+            # Keeps current threading moving
+            backtrack(next_x, next_y, color, cond)
             
-        # with cond:
 
-
-        return False
-
-    # Reset the stop flag before each maze solution
-    stop = False
-
-    path = []
-    start_x, start_y = maze.get_start_pos()
-    path.append((start_x, start_y))
-
-    maze.move(start_x, start_y, (0, 0, 255))
-
-    # Start the recursive backtracking from the initial position.
-    color = get_color()
-    backtrack(start_x, start_y, color)
-
+    cond = threading.Condition()
     
+    threads = []
 
+    curr_x, curr_y = maze.get_start_pos()
 
+    color = get_color()
+
+    maze.move(curr_x, curr_y, color)
+
+    t = threading.Thread(target=backtrack, args=(curr_x, curr_y, color, cond))
+
+    threads.append(t)
+
+    global thread_count
+
+    thread_count += 1
+
+    t.start()
+
+    for thread in threads:
+        thread.join()
+        # print("joining")
 
 
 
