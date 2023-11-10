@@ -2,10 +2,13 @@
 Course: CSE 251
 Lesson Week: 06
 File: assignment.py
-Author: <Your name here>
+Author: Stephen Skiles
 Purpose: Processing Plant
 Instructions:
 - Implement the classes to allow gifts to be created.
+
+I believe that my work on this assignment is a 4/4 because I met the requirements by making 3 pipes that connected the four necessary Process classes
+that communicated with each other and wrapped up gifts that contained bags of marbles and delivered the output to the boxes.txt file.
 """
 
 import random

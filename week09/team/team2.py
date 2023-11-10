@@ -59,20 +59,125 @@ Instructions:
   for example: philosophers[i] needs forks[i] and forks[i+1] to eat
 """
 
+# import time
+# import threading
+
+# PHILOSOPHERS = 5
+# MAX_MEALS = PHILOSOPHERS * 5
+
+# def main():
+#     # TODO - create the waiter (A class would be best here)
+#     # TODO - create the forks
+#     # TODO - create PHILOSOPHERS philosophers
+#     # TODO - Start them eating and thinking
+#     # TODO - Display how many times each philosopher ate
+
+#     pass
+
+# if __name__ == '__main__':
+#     main()
+
+
 import time
 import threading
+import random
+import queue
 
 PHILOSOPHERS = 5
-MAX_MEALS = PHILOSOPHERS * 5
+MAX_MEALS_EATEN = PHILOSOPHERS * 5
+
+class Waiter(threading.Thread):
+
+    # constructor
+    def __init__(self):
+        # calling parent class constructor
+        super().__init__()
+
+        # Create or assign any variables that you need
+        
+        
+    
+    # This is the method that is run when start() is called
+    def run(self):
+        
+        pass
+
+class Phil(threading.Thread):
+
+    # constructor
+    def __init__(self, fork1, fork2, cond, stats, counter, q, i):
+        # calling parent class constructor
+        super().__init__()
+
+        # Create or assign any variables that you need
+        self.fork1 = fork1
+        self.fork2 = fork2
+        self.cond = cond
+        self.stats = stats
+        self.counter = counter
+        self.q = q
+        self.i = i
+        
+    
+    # This is the method that is run when start() is called
+    def run(self):
+        
+        while (self.counter < MAX_MEALS_EATEN):
+          if self.q.qsize() > 0:
+              self.q.put("1")
+              break
+          self.fork1.acquire()
+          self.fork2.acquire()
+          print("Phil eating")
+          time.sleep(random.randrange(1,4))
+          print(f"rand: {random.randrange(1,4)}")
+          self.stats[self.i] += 1
+          self.counter += 1
+          print(self.counter)
+          # print(self.q.qsize())
+          self.fork1.release()
+          self.fork2.release()
+          print("Phil thinking")
+          time.sleep(random.randrange(1,4))
+          
+          if self.counter == MAX_MEALS_EATEN:
+              print("MAMXBHDHB")
+              self.q.put("2")
+              print(self.q.qsize())
+              break
+              # self.cond.notifyAll()
+          
+
+          
+
+        
 
 def main():
-    # TODO - create the waiter (A class would be best here)
-    # TODO - create the forks
-    # TODO - create PHILOSOPHERS philosophers
-    # TODO - Start them eating and thinking
-    # TODO - Display how many times each philosopher ate
+    condition = threading.Condition()
 
-    pass
+    # stats = list[[0] * PHILOSOPHERS]
+    stats = [0] * PHILOSOPHERS
+    print(stats)
+
+    counter = 0
+
+    q = queue.Queue()
+    
+    forks = [threading.Lock() for _ in range(PHILOSOPHERS)]
+
+    # Create philosopher threads dynamically
+    philosophers = []
+    for i in range(PHILOSOPHERS):
+        phil = Phil(forks[i], forks[(i + 1) % PHILOSOPHERS], condition, stats, counter, q, i)
+        philosophers.append(phil)
+        phil.start()
+
+    # Wait for all philosopher threads to finish
+    for phil in philosophers:
+        phil.join()
+        # TODO - Display how many times each philosopher ate
+        
+    print(stats)
 
 if __name__ == '__main__':
     main()

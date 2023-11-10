@@ -73,14 +73,91 @@ def get_color():
     current_color_index += 1
     return color
 
-def solve_find_end(maze):
-    """ finds the end position using threads.  Nothing is returned """
+
+
+
+def solve_find_end(maze: Maze):
+    """finds the end position using threads.  Nothing is returned"""
     # When one of the threads finds the end position, stop all of them
     global stop
     stop = False
 
+    cond = threading.Condition()
 
-    pass
+    def backtrack(x, y, color):
+        """Recursively backtracks through the maze, creating new threads for each new direction"""
+        # Base case: If we've reached the end position, return True.
+        # color = get_color()
+
+        with cond:
+            if maze.at_end(x, y) == True:
+                print("found end at:", x, y)
+
+                # Set the stop flag to True to stop all threads
+                global stop
+                stop = True
+
+                # Only notify threads that haven't found the end yet
+                cond.notify_all()
+
+                return True
+
+        # Check if the stop flag is set before proceeding with the recursive call.
+        if stop:
+            return True
+
+        # Get all possible moves from the current position.
+        possible_moves = maze.get_possible_moves(x, y)
+
+        # Create a list to store the threads
+        threads = []
+        
+
+        for next_x, next_y in possible_moves:
+            # Mark the current position as visited.
+            new_color = get_color()
+            thread = threading.Thread(
+                    target=backtrack, args=(next_x, next_y, new_color)
+                )
+            thread.start()
+            threads.append(thread)
+            if maze.can_move_here(next_x, next_y):
+                maze.move(next_x, next_y, new_color)
+
+            
+        # Check the stop flag before waiting for all threads to finish.
+        if stop:
+            return True
+
+        # Wait for all threads to finish before continuing.
+        for thread in threads:
+            thread.join()
+
+        # If a thread found the end, set the stop flag and return True.
+        with cond:
+            if stop:
+                return True
+            
+        # with cond:
+
+
+        return False
+
+    # Reset the stop flag before each maze solution
+    stop = False
+
+    path = []
+    start_x, start_y = maze.get_start_pos()
+    path.append((start_x, start_y))
+
+    maze.move(start_x, start_y, (0, 0, 255))
+
+    # Start the recursive backtracking from the initial position.
+    color = get_color()
+    backtrack(start_x, start_y, color)
+
+
+
 
 
 def find_end(log, filename, delay):

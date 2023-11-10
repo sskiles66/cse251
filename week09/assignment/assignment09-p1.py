@@ -2,7 +2,7 @@
 Course: CSE 251 
 Lesson Week: 09
 File: assignment09-p1.py 
-Author: <Add name here>
+Author: Stephen Skiles
 
 Purpose: Part 1 of assignment 09, finding a path to the end position in a maze
 
@@ -28,12 +28,45 @@ speed = SLOW_SPEED
 
 # TODO add any functions
 
-def solve_path(maze):
-    """ Solve the maze and return the path found between the start and end positions.  
-        The path is a list of positions, (x, y) """
-        
-    # TODO start add code here
+def solve_path(maze: Maze):
+    """Solve the maze and return the path found between the start and end positions.
+    The path is a list of positions, (x, y)."""
+
+
+    def backtrack(x, y):
+        # Base case: If we've reached the end position, return True.
+        if maze.at_end(x,y) == True:
+            print("found end")
+            return True
+
+        # Get all possible moves from the current position.
+        possible_moves = maze.get_possible_moves(x, y)
+
+        for next_x, next_y in possible_moves:
+            # Mark the current position as visited.
+            if (maze.can_move_here(next_x, next_y)):
+                maze.move(next_x, next_y, (0, 0, 255))
+
+
+            # Recurse to explore the next position.
+            if backtrack(next_x, next_y):
+                path.append((next_x, next_y))
+                return True
+
+            # Backtrack by restoring the previous position.
+            maze.restore(next_x, next_y)
+
+        return False
+
     path = []
+    start_x, start_y = maze.get_start_pos()
+    path.append((start_x, start_y))
+
+    maze.move(start_x, start_y, (0, 0, 255))
+
+    # Start the recursive backtracking from the initial position.
+    backtrack(start_x, start_y)
+
     return path
 
 
