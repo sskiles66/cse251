@@ -115,23 +115,35 @@ def solve_find_end(maze: Maze):
 
         for next_x, next_y in possible_moves:
             # Mark the current position as visited.
-            new_color = get_color()
+            if len(possible_moves) > 1:
+
+                color = get_color()
+            
+            if maze.can_move_here(next_x, next_y):
+                maze.move(next_x, next_y, color)
+                
+            
             thread = threading.Thread(
-                    target=backtrack, args=(next_x, next_y, new_color)
+                    target=backtrack, args=(next_x, next_y, color)
                 )
             thread.start()
             threads.append(thread)
-            if maze.can_move_here(next_x, next_y):
-                maze.move(next_x, next_y, new_color)
+            global thread_count
+            thread_count += 1
+            print(f"length of threads {thread_count}")
+            
 
             
         # Check the stop flag before waiting for all threads to finish.
         if stop:
             return True
 
+        
         # Wait for all threads to finish before continuing.
         for thread in threads:
             thread.join()
+
+        
 
         # If a thread found the end, set the stop flag and return True.
         with cond:
@@ -155,6 +167,8 @@ def solve_find_end(maze: Maze):
     # Start the recursive backtracking from the initial position.
     color = get_color()
     backtrack(start_x, start_y, color)
+
+    
 
 
 
