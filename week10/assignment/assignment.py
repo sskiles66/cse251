@@ -2,37 +2,49 @@
 Course: CSE 251
 Lesson Week: 10
 File: assignment.py
-Author: <your name>
+Author: Stephen Skiles
+
 
 Purpose: assignment for week 10 - reader writer problem
 
+
 Instructions:
 
+
 - Review TODO comments
+
 
 - writer: a process that will send numbers to the reader.  
   The values sent to the readers will be in consecutive order starting
   at value 1.  Each writer will use all of the sharedList buffer area
   (ie., BUFFER_SIZE memory positions)
 
+
 - reader: a process that receive numbers sent by the writer.  The reader will
   accept values until indicated by the writer that there are no more values to
   process.  
 
+
 - Do not use try...except statements
+
 
 - Display the numbers received by the reader printing them to the console.
 
+
 - Create WRITERS writer processes
+
 
 - Create READERS reader processes
 
+
 - You can use sleep() statements for any process.
+
 
 - You are able (should) to use lock(s) and semaphores(s).  When using locks, you can't
   use the arguments "block=False" or "timeout".  Your goal is to make your
   program as parallel as you can.  Over use of lock(s), or lock(s) in the wrong
   place will slow down your code.
+
 
 - You must use ShareableList between the two processes.  This shareable list
   will contain different "sections".  There can only be one shareable list used
@@ -43,35 +55,117 @@ Instructions:
   3) Any indexes that the processes need to keep track of the data queue
   4) Any other values you need for the assignment
 
+
 - Not allowed to use Queue(), Pipe(), List(), Barrier() or any other data structure.
 
-- Not allowed to use Value() or Array() or any other shared data type from 
+
+- Not allowed to use Value() or Array() or any other shared data type from
   the multiprocessing package.
+
 
 - When each reader reads a value from the sharedList, use the following code to display
   the value:
-  
+ 
                     print(<variable>, end=', ', flush=True)
+
 
 Add any comments for me:
 
+
 """
+
 
 import random
 from multiprocessing.managers import SharedMemoryManager
 import multiprocessing as mp
+import time
+
 
 BUFFER_SIZE = 10
 READERS = 2
 WRITERS = 2
 
+
+
+"""
+A ShareableList is created with a size of BUFFER_SIZE + 4. The first BUFFER_SIZE elements are 
+used as a circular buffer for data transfer between the writer and reader processes. The next 
+two elements are used as the write and read indices for the circular buffer. 
+The third extra element is used as a control signal to indicate when the writer has finished writing data. 
+The fourth extra element is used to keep track of the number of values received by the reader.
+
+-4 = write index
+-3 = read index
+-2 = stop flag
+-1 = values received
+
+Currently, the code works with one process for each writing and reading (sometimes).
+
+"""
+
+
+def read(shared_list, lock):
+    while True:
+        lock.acquire()
+        if shared_list[-4] != shared_list[-3]:  # If the buffer is not empty, if the write index != read index
+            print(f"received {shared_list[shared_list[-3]]}")  #Print the element at the index that corresponds to the read index
+            shared_list[shared_list[-3]] = 0   # Set the previous element to 0.
+
+            """
+            calculates the next read index. The % BUFFER_SIZE part ensures that the index 
+            wraps around to the start of the buffer when it reaches the end, hence creating a "circular" buffer.
+            """
+            shared_list[-3] = (shared_list[-3] + 1) % BUFFER_SIZE  
+            shared_list[-1] += 1  # Increment the count of received items
+        lock.release()
+        if shared_list[-2] == "stop":
+            for _ in range(BUFFER_SIZE):
+                if shared_list[shared_list[-3]] != 0:
+                    print(f"received {shared_list[shared_list[-3]]}")
+                    shared_list[shared_list[-3]] = 0
+                    shared_list[-1] += 1  # Increment the count of received items
+                shared_list[-3] = (shared_list[-3] + 1) % BUFFER_SIZE
+            print(shared_list)
+            break
+
+
+
+
+def write(shared_list, items_to_send, lock:mp.Lock):
+    for i in range(items_to_send):
+        lock.acquire()
+        next_write_index = (shared_list[-4] + 1) % BUFFER_SIZE  #finds next write index
+        """
+        If the buffer is not full and the next write index is available.  
+        This prevents the write function from overwriting data that has not been read yet, 
+        which could cause the number of values sent to not match the number of values received.
+
+        checks if the next write index is not equal to the current read index (shared_list[-3]) 
+        and if the value at the next write index is 0. If both conditions are true, this means 
+        that the buffer is not full and the next write index is available for writing.
+        """
+        if next_write_index != shared_list[-3] and shared_list[next_write_index] == 0:  
+            time.sleep(0.01)
+            rand_num = random.randint(1,10)
+            shared_list[shared_list[-4]] = rand_num
+            shared_list[-4] = next_write_index
+            print(shared_list)
+        lock.release()
+    shared_list[-2] = "stop"
+
+
+
+
 def main():
+
 
     # This is the number of values that the writer will send to the reader
     items_to_send = random.randint(1000, 10000)
 
+
     smm = SharedMemoryManager()
     smm.start()
+
 
     # TODO - Create a ShareableList to be used between the processes
     #      - The buffer should be size 10 PLUS at least three other
@@ -84,21 +178,65 @@ def main():
     #        track of the number of values received by the readers.
     #        (ie., [0] * (BUFFER_SIZE + 4))
 
+
+    share_list = smm.ShareableList([0] * (BUFFER_SIZE + 5 ))
+
+
     # TODO - Create any lock(s) or semaphore(s) that you feel you need
+
+
+    lock = mp.Lock()
+   
+
 
     # TODO - create reader and writer processes
 
+
+    # write(share_list, items_to_send, lock)
+
+
+    write_pro = mp.Process(target=write, args=(share_list, items_to_send, lock))
+    read_pro = mp.Process(target=read, args=(share_list, lock))
+
+
+    write_pro2 = mp.Process(target=write, args=(share_list, items_to_send, lock))
+    read_pro2 = mp.Process(target=read, args=(share_list, lock))
+
+
     # TODO - Start the processes and wait for them to finish
 
+
+    write_pro.start()
+    read_pro.start()
+    # write_pro2.start()
+    # read_pro2.start()
+
+
+   
+    write_pro.join()
+    read_pro.join()
+    # write_pro2.join()
+    # read_pro2.join()
+
+
     print(f'{items_to_send} values sent')
+
 
     # TODO - Display the number of numbers/items received by the reader.
     #        Can not use "items_to_send", must be a value collected
     #        by the reader processes.
     # print(f'{<your variable>} values received')
 
+
+    print(f'{share_list[-1]} values received')
+
+
     smm.shutdown()
+
+
 
 
 if __name__ == '__main__':
     main()
+
+

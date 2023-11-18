@@ -88,28 +88,32 @@ MAX_MEALS_EATEN = PHILOSOPHERS * 5
 
 class Waiter(threading.Thread):
 
-    # constructor
-    def __init__(self):
-        # calling parent class constructor
+
+    def __init__(self, condition:threading.Condition):
+
         super().__init__()
 
-        # Create or assign any variables that you need
+
         
-        
+        self.condition = condition
     
-    # This is the method that is run when start() is called
+
     def run(self):
-        
-        pass
+        while True:
+          # print("before cond")
+          with self.condition:
+              # print("after cond")
+              self.condition.notify_all()
+              
 
 class Phil(threading.Thread):
 
-    # constructor
-    def __init__(self, fork1, fork2, cond, stats, counter, q, i):
-        # calling parent class constructor
+
+    def __init__(self, fork1, fork2, cond:threading.Condition, stats, counter, q, i):
+
         super().__init__()
 
-        # Create or assign any variables that you need
+
         self.fork1 = fork1
         self.fork2 = fork2
         self.cond = cond
@@ -119,32 +123,36 @@ class Phil(threading.Thread):
         self.i = i
         
     
-    # This is the method that is run when start() is called
+    
     def run(self):
         
         while (self.counter < MAX_MEALS_EATEN):
           if self.q.qsize() > 0:
               self.q.put("1")
               break
-          self.fork1.acquire()
-          self.fork2.acquire()
-          print("Phil eating")
-          time.sleep(random.randrange(1,4))
-          print(f"rand: {random.randrange(1,4)}")
-          self.stats[self.i] += 1
-          self.counter += 1
-          print(self.counter)
-          # print(self.q.qsize())
-          self.fork1.release()
-          self.fork2.release()
-          print("Phil thinking")
-          time.sleep(random.randrange(1,4))
-          
-          if self.counter == MAX_MEALS_EATEN:
-              print("MAMXBHDHB")
-              self.q.put("2")
-              print(self.q.qsize())
-              break
+          with self.cond:
+            print(f"{self.i} waiting")
+            self.cond.wait()
+            print(f"{self.i} notified")
+            self.fork1.acquire()
+            self.fork2.acquire()
+            print(f"{self.i} Phil eating")
+            time.sleep(random.randrange(1,4))
+            # print(f"rand: {random.randrange(1,4)}")
+            self.stats[self.i] += 1
+            self.counter += 1
+            print(self.counter)
+            # print(self.q.qsize())
+            self.fork1.release()
+            self.fork2.release()
+            print(f"{self.i} Phil thinking")
+            time.sleep(random.randrange(1,4))
+            
+            if self.counter == MAX_MEALS_EATEN:
+                print("MAMXBHDHB")
+                self.q.put("2")
+                print(self.q.qsize())
+                break
               # self.cond.notifyAll()
           
 
@@ -154,6 +162,7 @@ class Phil(threading.Thread):
 
 def main():
     condition = threading.Condition()
+    
 
     # stats = list[[0] * PHILOSOPHERS]
     stats = [0] * PHILOSOPHERS
@@ -162,8 +171,14 @@ def main():
     counter = 0
 
     q = queue.Queue()
+
+    sem = threading.Semaphore(PHILOSOPHERS)
     
     forks = [threading.Lock() for _ in range(PHILOSOPHERS)]
+
+    waiter = Waiter(condition)
+
+    waiter.start()
 
     # Create philosopher threads dynamically
     philosophers = []
@@ -176,6 +191,7 @@ def main():
     for phil in philosophers:
         phil.join()
         # TODO - Display how many times each philosopher ate
+    waiter.join()
         
     print(stats)
 

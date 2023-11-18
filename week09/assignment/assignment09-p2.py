@@ -24,6 +24,9 @@ Why would it work?
 
 <Answer here>
 
+
+
+
 """
 import math
 import threading 
@@ -63,6 +66,7 @@ current_color_index = 0
 thread_count = 0
 stop = False
 speed = SLOW_SPEED
+threads = []
 
 def get_color():
     """ Returns a different color when called """
@@ -73,7 +77,39 @@ def get_color():
     current_color_index += 1
     return color
 
+def backtrack(x, y, color, cond, maze: Maze):
+        
+    for next_x, next_y in maze.get_possible_moves(x,y):
+        if len(maze.get_possible_moves(x, y)) > 1:
+            # print(f"lengt of possible: {len(maze.get_possible_moves(x, y))}")
+            for i, (next_x, next_y) in enumerate(maze.get_possible_moves(x,y)):
+                if i < len(maze.get_possible_moves(x, y)) - 1:
+                    color = get_color()
+                    t = threading.Thread(target=backtrack, args=(x, y, color, cond, maze))
+                    threads.append(t)
+                    global thread_count
+                    thread_count += 1
+                    t.start()
+                    #python assignment09-p2.py
+                else:
+                    if maze.can_move_here(next_x, next_y):
+                        maze.move(next_x, next_y, color)
+                    backtrack(next_x, next_y, color, cond, maze)
 
+        if maze.can_move_here(next_x, next_y):
+            maze.move(next_x, next_y, color)
+                        
+        with cond:
+            if maze.at_end(next_x, next_y) == True:
+                print("found end at:", x, y)
+                global stop
+                stop = True
+                cond.notify_all()
+                return True
+            if stop:
+                return True
+            # Keeps current threading moving
+            backtrack(next_x, next_y, color, cond, maze)
 
 
 def solve_find_end(maze: Maze):
@@ -82,43 +118,9 @@ def solve_find_end(maze: Maze):
     global stop
     stop = False
 
-    def backtrack(x, y, color, cond):
-        
-        for next_x, next_y in maze.get_possible_moves(x,y):
-            if len(maze.get_possible_moves(x, y)) > 1:
-                # print(f"lengt of possible: {len(maze.get_possible_moves(x, y))}")
-                for i, (next_x, next_y) in enumerate(maze.get_possible_moves(x,y)):
-                    if i > 0:
-                        color = get_color()
-                        t = threading.Thread(target=backtrack, args=(x, y, color, cond))
-                        threads.append(t)
-                        global thread_count
-                        thread_count += 1
-                        t.start()
-                    else:
-                        if maze.can_move_here(next_x, next_y):
-                            maze.move(next_x, next_y, color)
-                        backtrack(next_x, next_y, color, cond)
-
-            if maze.can_move_here(next_x, next_y):
-                maze.move(next_x, next_y, color)
-                        
-            with cond:
-                if maze.at_end(next_x, next_y) == True:
-                    print("found end at:", x, y)
-                    global stop
-                    stop = True
-                    cond.notify_all()
-                    return True
-            if stop:
-                return True
-            # Keeps current threading moving
-            backtrack(next_x, next_y, color, cond)
-            
-
+    
     cond = threading.Condition()
     
-    threads = []
 
     curr_x, curr_y = maze.get_start_pos()
 
@@ -126,7 +128,7 @@ def solve_find_end(maze: Maze):
 
     maze.move(curr_x, curr_y, color)
 
-    t = threading.Thread(target=backtrack, args=(curr_x, curr_y, color, cond))
+    t = threading.Thread(target=backtrack, args=(curr_x, curr_y, color, cond, maze))
 
     threads.append(t)
 
@@ -138,7 +140,7 @@ def solve_find_end(maze: Maze):
 
     for thread in threads:
         thread.join()
-        # print("joining")
+        
 
 
 

@@ -28,12 +28,7 @@ speed = SLOW_SPEED
 
 # TODO add any functions
 
-def solve_path(maze: Maze):
-    """Solve the maze and return the path found between the start and end positions.
-    The path is a list of positions, (x, y)."""
-
-
-    def backtrack(x, y):
+def backtrack(x, y, maze, path):
         # Base case: If we've reached the end position, return True.
         if maze.at_end(x,y) == True:
             print("found end")
@@ -49,7 +44,7 @@ def solve_path(maze: Maze):
 
 
             # Recurse to explore the next position.
-            if backtrack(next_x, next_y):
+            if backtrack(next_x, next_y, maze, path):
                 path.append((next_x, next_y))
                 return True
 
@@ -58,6 +53,11 @@ def solve_path(maze: Maze):
 
         return False
 
+
+def solve_path(maze: Maze):
+    """Solve the maze and return the path found between the start and end positions.
+    The path is a list of positions, (x, y)."""
+
     path = []
     start_x, start_y = maze.get_start_pos()
     path.append((start_x, start_y))
@@ -65,7 +65,7 @@ def solve_path(maze: Maze):
     maze.move(start_x, start_y, (0, 0, 255))
 
     # Start the recursive backtracking from the initial position.
-    backtrack(start_x, start_y)
+    backtrack(start_x, start_y, maze, path)
 
     return path
 

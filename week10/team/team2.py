@@ -12,12 +12,19 @@ import threading
 import random
 import string
 import os
+import mmap
 
 # -----------------------------------------------------------------------------
+
+
 def reverse_file(filename):
     """ Display a file in reverse order using a mmap file. """
-    # TODO add code here
-    pass
+    with open(filename, mode="r", encoding="utf8") as file_obj:
+        with mmap.mmap(file_obj.fileno(), length=0, access=mmap.ACCESS_READ) as map_file:
+            for i in reversed(range(map_file.size())):
+                print(map_file[i]) 
+                print(chr(map_file[i]), end='')
+
 
 
 # -----------------------------------------------------------------------------
@@ -29,8 +36,18 @@ def promote_letter_a(filename):
 
     You are not creating a different file.  Change the file using mmap file.
     """
-    # TODO add code here
-    pass
+    
+    with open(filename, mode="r+b") as file_obj:
+        
+        with mmap.mmap(file_obj.fileno(), length=0, access=mmap.ACCESS_WRITE) as map_file:
+            
+            for i in range(map_file.size()):
+                if map_file[i] == ord('a'):
+                    map_file[i] = ord('A')
+                elif ord('b') <= map_file[i] <= ord('z'):
+                    map_file[i] = ord('.')
+                print(map_file.size())
+                print(i)
 
 
 # -----------------------------------------------------------------------------
@@ -45,7 +62,41 @@ def promote_letter_a_threads(filename):
     Use N threads to process the file where each thread will be 1/N of the file.
     """
     # TODO add code here
-    pass
+    with open(filename, mode="r+b") as file_obj:
+        
+        with mmap.mmap(file_obj.fileno(), length=0, access=mmap.ACCESS_WRITE) as map_file:
+
+            split = 200000
+
+            num_threads = map_file.size() / split
+
+            start = 0
+
+            end = split
+
+            threaddds = []
+            
+            for thread in range(int(num_threads)):
+                threead = threading.Thread(target=threads, args=(map_file,start,end))
+                start = end
+                end += split
+                threaddds.append(threead)
+                threead.start()
+
+            
+            
+            for threadd in threaddds:
+                threadd.join()
+
+def threads(map_file, start, end):
+    i = start
+    for i in range(end):
+        if map_file[i] == ord('a'):
+            map_file[i] = ord('A')
+        elif ord('b') <= map_file[i] <= ord('z'):
+            map_file[i] = ord('.')
+        print(map_file.size())
+        print(i)
 
 
 def create_large_file(filename):
@@ -73,7 +124,7 @@ def create_large_file(filename):
 def main():
     create_large_file('letter_a.txt')
     reverse_file('data.txt')
-    promote_letter_a('letter_a.txt')
+    # promote_letter_a('letter_a.txt')
     
     # TODO
     # When you get the function promote_letter_a() working
