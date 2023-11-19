@@ -82,8 +82,8 @@ import time
 
 
 BUFFER_SIZE = 10
-READERS = 2
-WRITERS = 2
+READERS = 1
+WRITERS = 1
 
 
 
@@ -94,17 +94,20 @@ two elements are used as the write and read indices for the circular buffer.
 The third extra element is used as a control signal to indicate when the writer has finished writing data. 
 The fourth extra element is used to keep track of the number of values received by the reader.
 
+-6 = Current index so that multiple write process are on the same page when progressing towards the end value
+-5 = How many values need to be sent
 -4 = write index
 -3 = read index
 -2 = stop flag
 -1 = values received
 
-Currently, the code works with one process for each writing and reading (sometimes).
+Currently, code is close but 0s are being processed at the end and there is usually a constant 
+change multiple of two as processes increase.
 
 """
 
 
-def read(shared_list, lock):
+def read(shared_list, lock, i):
     while True:
         lock.acquire()
         if shared_list[-4] != shared_list[-3]:  # If the buffer is not empty, if the write index != read index
@@ -121,18 +124,24 @@ def read(shared_list, lock):
         if shared_list[-2] == "stop":
             for _ in range(BUFFER_SIZE):
                 if shared_list[shared_list[-3]] != 0:
-                    print(f"received {shared_list[shared_list[-3]]}")
+                    lock.acquire()
+                    print(f"received {shared_list[shared_list[-3]]} after")
                     shared_list[shared_list[-3]] = 0
                     shared_list[-1] += 1  # Increment the count of received items
+                    lock.release()
                 shared_list[-3] = (shared_list[-3] + 1) % BUFFER_SIZE
-            print(shared_list)
+            print(f"Final: {shared_list}")
+            
             break
 
 
 
 
-def write(shared_list, items_to_send, lock:mp.Lock):
-    for i in range(items_to_send):
+def write(shared_list, items_to_send, lock:mp.Lock, i):
+
+    while shared_list[-6] < shared_list[-5]:
+        
+        
         lock.acquire()
         next_write_index = (shared_list[-4] + 1) % BUFFER_SIZE  #finds next write index
         """
@@ -145,11 +154,23 @@ def write(shared_list, items_to_send, lock:mp.Lock):
         that the buffer is not full and the next write index is available for writing.
         """
         if next_write_index != shared_list[-3] and shared_list[next_write_index] == 0:  
-            time.sleep(0.01)
+            # time.sleep(0.01)
+            print()
+            print("WRITING")
+            print("Before")
+            print(shared_list)
             rand_num = random.randint(1,10)
             shared_list[shared_list[-4]] = rand_num
             shared_list[-4] = next_write_index
+            
+            print("After")
             print(shared_list)
+            # time.sleep(5)
+
+            shared_list[-6] += 1
+            
+            print(f"write count: {shared_list[-6]} with process {i}")
+            print()
         lock.release()
     shared_list[-2] = "stop"
 
@@ -179,44 +200,39 @@ def main():
     #        (ie., [0] * (BUFFER_SIZE + 4))
 
 
-    share_list = smm.ShareableList([0] * (BUFFER_SIZE + 5 ))
+    share_list = smm.ShareableList([0] * (BUFFER_SIZE + 6))
 
-
+    
     # TODO - Create any lock(s) or semaphore(s) that you feel you need
+
+    share_list[-5] = items_to_send
 
 
     lock = mp.Lock()
-   
 
 
     # TODO - create reader and writer processes
 
 
-    # write(share_list, items_to_send, lock)
+    processes = []
+
+    for i in range(WRITERS):
+       write_pro =  mp.Process(target=write, args=(share_list, items_to_send, lock, i))
+       processes.append(write_pro)
+
+    for i in range(READERS):
+       read_pro = mp.Process(target=read, args=(share_list, lock, i))
+       processes.append(read_pro)
 
 
-    write_pro = mp.Process(target=write, args=(share_list, items_to_send, lock))
-    read_pro = mp.Process(target=read, args=(share_list, lock))
+    for process in processes:
+        process.start()
 
-
-    write_pro2 = mp.Process(target=write, args=(share_list, items_to_send, lock))
-    read_pro2 = mp.Process(target=read, args=(share_list, lock))
+    for process in processes:
+        process.join()
 
 
     # TODO - Start the processes and wait for them to finish
-
-
-    write_pro.start()
-    read_pro.start()
-    # write_pro2.start()
-    # read_pro2.start()
-
-
-   
-    write_pro.join()
-    read_pro.join()
-    # write_pro2.join()
-    # read_pro2.join()
 
 
     print(f'{items_to_send} values sent')
