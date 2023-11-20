@@ -82,8 +82,8 @@ import time
 
 
 BUFFER_SIZE = 10
-READERS = 1
-WRITERS = 1
+READERS = 2
+WRITERS = 2
 
 
 
@@ -101,9 +101,6 @@ The fourth extra element is used to keep track of the number of values received 
 -2 = stop flag
 -1 = values received
 
-Currently, code is close but 0s are being processed at the end and there is usually a constant 
-change multiple of two as processes increase.
-
 """
 
 
@@ -111,7 +108,7 @@ def read(shared_list, lock, i):
     while True:
         lock.acquire()
         if shared_list[-4] != shared_list[-3]:  # If the buffer is not empty, if the write index != read index
-            print(f"received {shared_list[shared_list[-3]]}")  #Print the element at the index that corresponds to the read index
+            print(f"received {shared_list[shared_list[-3]]}", end=', ', flush=True)   #Print the element at the index that corresponds to the read index
             shared_list[shared_list[-3]] = 0   # Set the previous element to 0.
 
             """
@@ -122,14 +119,16 @@ def read(shared_list, lock, i):
             shared_list[-1] += 1  # Increment the count of received items
         lock.release()
         if shared_list[-2] == "stop":
+            lock.acquire()
             for _ in range(BUFFER_SIZE):
                 if shared_list[shared_list[-3]] != 0:
-                    lock.acquire()
-                    print(f"received {shared_list[shared_list[-3]]} after")
+                    
+                    print(f"received {shared_list[shared_list[-3]]} after end", end=', ', flush=True)
                     shared_list[shared_list[-3]] = 0
                     shared_list[-1] += 1  # Increment the count of received items
-                    lock.release()
+                    
                 shared_list[-3] = (shared_list[-3] + 1) % BUFFER_SIZE
+            lock.release()
             print(f"Final: {shared_list}")
             
             break
@@ -153,7 +152,7 @@ def write(shared_list, items_to_send, lock:mp.Lock, i):
         and if the value at the next write index is 0. If both conditions are true, this means 
         that the buffer is not full and the next write index is available for writing.
         """
-        if next_write_index != shared_list[-3] and shared_list[next_write_index] == 0:  
+        if next_write_index != shared_list[-3] and shared_list[next_write_index] == 0 and shared_list[-6] < shared_list[-5]:  
             # time.sleep(0.01)
             print()
             print("WRITING")
@@ -167,6 +166,7 @@ def write(shared_list, items_to_send, lock:mp.Lock, i):
             print(shared_list)
             # time.sleep(5)
 
+            
             shared_list[-6] += 1
             
             print(f"write count: {shared_list[-6]} with process {i}")
