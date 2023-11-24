@@ -78,8 +78,6 @@ Add any comments for me:
 import random
 from multiprocessing.managers import SharedMemoryManager
 import multiprocessing as mp
-import time
-
 
 BUFFER_SIZE = 10
 READERS = 2
@@ -101,6 +99,10 @@ The fourth extra element is used to keep track of the number of values received 
 -2 = stop flag
 -1 = values received
 
+I believe that my work on this assignment is a 4/4 because I met the requirements of the assignment. 
+Using a shareable list that can be used across mutliple reading and writing processes, values (in order) are written and read and 
+the amount of items sent is equal to the amount of items received. There can be n number of processes for both reading and writing.
+
 """
 
 
@@ -108,7 +110,7 @@ def read(shared_list, lock, i):
     while True:
         lock.acquire()
         if shared_list[-4] != shared_list[-3]:  # If the buffer is not empty, if the write index != read index
-            print(f"received {shared_list[shared_list[-3]]}", end=', ', flush=True)   #Print the element at the index that corresponds to the read index
+            print(f"Received {shared_list[shared_list[-3]]}", end=', ', flush=True)   #Print the element at the index that corresponds to the read index
             shared_list[shared_list[-3]] = 0   # Set the previous element to 0.
 
             """
@@ -154,23 +156,23 @@ def write(shared_list, items_to_send, lock:mp.Lock, i):
         """
         if next_write_index != shared_list[-3] and shared_list[next_write_index] == 0 and shared_list[-6] < shared_list[-5]:  
             # time.sleep(0.01)
-            print()
-            print("WRITING")
-            print("Before")
-            print(shared_list)
-            rand_num = random.randint(1,10)
-            shared_list[shared_list[-4]] = rand_num
+            # print()
+            # print("WRITING")   Printing writing for debugging
+            # print("Before")
+            # print(shared_list)
+            # rand_num = random.randint(1,10)
+            shared_list[shared_list[-4]] = shared_list[-6]
             shared_list[-4] = next_write_index
             
-            print("After")
-            print(shared_list)
+            # print("After")
+            # print(shared_list)   Printing writing for debugging
             # time.sleep(5)
 
             
             shared_list[-6] += 1
             
-            print(f"write count: {shared_list[-6]} with process {i}")
-            print()
+            # print(f"write count: {shared_list[-6]} with process {i}")
+            # print()        Prinign writing for debugging
         lock.release()
     shared_list[-2] = "stop"
 
