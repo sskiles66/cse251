@@ -46,6 +46,7 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"sync"
 )
 
 type Person struct {
@@ -67,7 +68,14 @@ type Person struct {
 	Vehicles   []string
 }
 
-func getPerson(url string) {
+type Species struct {
+    Name          string `json:"name"`
+    AverageHeight string `json:"average_height"`
+    Language      string `json:"language"`
+}
+
+func getPerson(url string, wg *sync.WaitGroup) {
+	defer wg.Done() // decrement the counter when the goroutine completes
 	// make a sample HTTP GET request
 	res, err := http.Get(url)
 
@@ -98,6 +106,39 @@ func getPerson(url string) {
 	fmt.Println("Eye color : ", person.Eye_color)
 }
 
+func getSpecies(url string, wg *sync.WaitGroup) {
+	defer wg.Done() // decrement the counter when the goroutine completes
+	// make a sample HTTP GET request
+	res, err := http.Get(url)
+
+	// check for response error
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// read all response body
+	data, _ := ioutil.ReadAll(res.Body)
+
+	// close response body
+	res.Body.Close()
+
+	// fmt.Println(string(data))
+
+	species := Species{}
+	jsonErr := json.Unmarshal(data, &person)
+	if jsonErr != nil {
+		log.Fatal(jsonErr)
+		fmt.Println("ERROR Pasing the JSON")
+	}
+
+	fmt.Println("-----------------------------------------------")
+	// fmt.Println(person)
+	fmt.Println("Name      : ", species.Name)
+	fmt.Println("Average Height     : ", species.AverageHeight)
+	fmt.Println("Language : ", species.Language)
+}
+
+
 func main() {
 	urls := []string{
 		"http://swapi.dev/api/people/1/",
@@ -120,9 +161,44 @@ func main() {
 		"http://swapi.dev/api/people/81/",
 	}
 
+	var wg sync.WaitGroup // create a WaitGroup
+
 	for _, url := range urls {
-		getPerson(url)
+		wg.Add(1) // increment the counter
+        go getPerson(url, &wg) // pass the WaitGroup to the goroutine
 	}
+
+	wg.Wait()
+
+	speciesUrls := []string{
+        "http://swapi.dev/api/species/1/",
+		"http://swapi.dev/api/species/2/",
+		"http://swapi.dev/api/species/3/",
+		"http://swapi.dev/api/species/6/",
+		"http://swapi.dev/api/species/15/",
+		"http://swapi.dev/api/species/19/",
+		"http://swapi.dev/api/species/20/",
+		"http://swapi.dev/api/species/23/",
+		"http://swapi.dev/api/species/24/",
+		"http://swapi.dev/api/species/25/",
+		"http://swapi.dev/api/species/26/",
+		"http://swapi.dev/api/species/27/",
+		"http://swapi.dev/api/species/28/",
+		"http://swapi.dev/api/species/29/",
+		"http://swapi.dev/api/species/30/",
+		"http://swapi.dev/api/species/33/",
+		"http://swapi.dev/api/species/34/",
+		"http://swapi.dev/api/species/35/",
+		"http://swapi.dev/api/species/36/",
+		"http://swapi.dev/api/species/37/",
+    }
+
+	for _, url := range speciesUrls {
+		wg.Add(1) // increment the counter
+        go getSpecies(url, &wg) // pass the WaitGroup to the goroutine
+	}
+
+	wg.Wait()
 
 	fmt.Println("All done!")
 }

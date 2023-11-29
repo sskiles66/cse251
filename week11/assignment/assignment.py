@@ -2,12 +2,18 @@
 Course: CSE 251
 Lesson Week: 11
 File: Assignment.py
+Author: Stephen Skiles
+
+I believe that my work on this assignment is a 4/4 because I met the requirements. 
+Guests can start a party (and turn on the lights) and end a party (turn off the lights) where can guests can enter and leave the party.
+Cleaners can only enter the room and clean when no one is in there and the same goes for a guest starting a party.
+I also display how many times the room was cleaned and how many parties there were. (Value from multiprocessing was used).
 """
 
 import time
 import random
 import multiprocessing as mp
-from multiprocessing import Array, Value
+from multiprocessing import Value
 
 # number of cleaning staff and hotel guests
 CLEANING_STAFF = 2
@@ -36,7 +42,7 @@ def guest_partying(id, count):
     print(f'Guest: {id}, count = {count}')
     time.sleep(random.uniform(0, 1))
 
-def cleaner(lock1, lock2, id, guests, start_time, count):
+def cleaner(room_lock, cleaner_lock, id, guests, start_time, count):
     """
     do the following for TIME seconds
         cleaner will wait to try to clean the room (cleaner_waiting())
@@ -45,31 +51,27 @@ def cleaner(lock1, lock2, id, guests, start_time, count):
         Take some time cleaning (cleaner_cleaning())
         display message STOPPING_CLEANING_MESSAGE
     """
-    # lock1.acquire()
-    # print("cleaner working")
-    # time.sleep(2)
-    # lock1.release()
 
     while time.time() - start_time < TIME:
         cleaner_waiting()
-
-        # lock1.acquire()
+        cleaner_lock.acquire()
+        room_lock.acquire()
+        
         if guests.value == 0:
-            lock1.acquire()
+            
             # lock2.acquire()
             print(STARTING_CLEANING_MESSAGE)
             cleaner_cleaning(id)
             print(STOPPING_CLEANING_MESSAGE)
             count.value += 1
-            lock1.release()
             # lock2.release()
-        # lock1.release()
-
-        # time.sleep(1)
+            
+        room_lock.release()
+        cleaner_lock.release()
 
 
    
-def guest(lock1, lock2, semaphore, id, guests, start_time, count):
+def guest(room_lock, cleaner_lock, semaphore, id, guests, start_time, count):
     """
     do the following for TIME seconds
         guest will wait to try to get access to the room (guest_waiting())
@@ -78,34 +80,32 @@ def guest(lock1, lock2, semaphore, id, guests, start_time, count):
         Take some time partying (call guest_partying())
         display message STOPPING_PARTY_MESSAGE if the guest is the last one leaving in the room
     """
-    # lock1.acquire()
-    # semaphore
-    # print("guest working")
-    # time.sleep(2)
-    # lock1.release()
 
     while time.time() - start_time < TIME:
         guest_waiting()
 
-        lock1.acquire()
+        room_lock.acquire()
+        
         if guests.value == 0:
             print(STARTING_PARTY_MESSAGE)
         guests.value += 1
-        lock1.release()
+        
+        room_lock.release()
 
         guest_partying(id, guests.value)
 
-        lock1.acquire()
+        room_lock.acquire()
+        
         guests.value -= 1
+        cleaner_lock.acquire()
+
         if guests.value == 0:
             print(STOPPING_PARTY_MESSAGE)
             count.value += 1
-        lock1.release()
 
-        # time.sleep(1)
-
-
-
+        cleaner_lock.release()
+        
+        room_lock.release()
 
 
 def main():
