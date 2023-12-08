@@ -1,7 +1,7 @@
 """
 Course: CSE 251, week 14
 File: functions.py
-Author: <your name>
+Author: Stephen Skiles
 
 Instructions:
 
@@ -57,84 +57,207 @@ Extra (Optional) 10% Bonus to speed up part 3
 
 """
 from common import *
-import queue
+import threading, queue
 
-depth = 6
+from concurrent.futures import ThreadPoolExecutor
 
+threads = []
+
+def threaded_fs(family_response, result_dict, id_request, type_of_id_response, tree:Tree):
+
+    request = Request_thread(f'{TOP_API_URL}/person/{id_request}')
+    request.start()
+    request.join()
+    result_dict[type_of_id_response] = request.get_response()
+    family_member = Person(result_dict[type_of_id_response])
+
+    if tree.does_person_exist(id_request) == False:
+
+        tree.add_person(family_member)
+        
 # -----------------------------------------------------------------------------
 def depth_fs_pedigree(family_id, tree: Tree):
     # KEEP this function even if you don't implement it
     # TODO - implement Depth first retrieval
     # TODO - Printing out people and families that are retrieved from the server will help debugging
-    # Do inorder traversal. Just adding to tree object, not building a new BST.
 
-    global depth
-    if depth == 0:
-        return
-
-    print(family_id)  ## Print
-    
+    result_dict = {}
+  
     family_request = Request_thread(f'{TOP_API_URL}/family/{family_id}')
     family_request.start()
     family_request.join()
     family_response = family_request.get_response()
-    print(family_response)  ## Print
 
     if family_response:
+
         family = Family(family_response)
-        print(f"Family Info: {family}")  ### Print
         tree.add_family(family)
+
+        if family_response["husband_id"] != None:
+
+            husband_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, family_response["husband_id"], "husband_response", tree))
+            husband_thread.start()
+
+        if family_response["wife_id"] != None:        
+            wife_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, family_response["wife_id"], "wife_response", tree))
+            wife_thread.start()
 
         children = family_response["children"]
 
-        print(children)  ## Print
+        child_threads = []
 
         for child in children:
-            child_request = Request_thread(f'{TOP_API_URL}/person/{child}')
-            child_request.start()
-            child_request.join()
-            child_response = child_request.get_response()
-            child = Person(child_response)
-            tree.add_person(child)
 
-            print(f"CHILD INFORMATION: {child}")
-
-        husband_request = Request_thread(f'{TOP_API_URL}/person/{family_response["husband_id"]}')
-        husband_request.start()
-        husband_request.join()
-        husband_response = husband_request.get_response()
-        husband = Person(husband_response)
-        tree.add_person(husband)
-        print(f"Husband INFORMATION: {husband}")
+            child_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, child, "child_response", tree))
+            child_thread.start()
+            child_threads.append(child_thread)
 
         
+        if family_response["husband_id"] != None: 
+            husband_thread.join()
+        if family_response["wife_id"] != None: 
+            wife_thread.join()
 
-        wife_request = Request_thread(f'{TOP_API_URL}/person/{family_response["wife_id"]}')
-        wife_request.start()
-        wife_request.join()
-        wife_response = wife_request.get_response()
-        wife = Person(wife_response)
-        tree.add_person(wife)
-        print(f"Wife INFORMATION: {wife}")
+        for thread in child_threads:
+            thread.join()
 
+        with ThreadPoolExecutor() as executor:
+
+            if family_response["husband_id"] != None:
+
+                husband_response = result_dict["husband_response"]
+
+                if husband_response["parent_id"] != None:
+
+                    # husband_parent_request = Request_thread(f'{TOP_API_URL}/family/{husband_response["parent_id"]}')
+                    # husband_parent_request.start()
+                    # husband_parent_request.join()
+                    # husband_parent_response = husband_parent_request.get_response()
+
+                    # t1 = threading.Thread(target=depth_fs_pedigree, args=(husband_response["parent_id"], tree))
+
+                    # threads.append(t1)
+
+                    # t1.start()
+
+                    # t1.join()
+
+                    executor.submit(depth_fs_pedigree, husband_response["parent_id"], tree)
+
+
+                    # depth_fs_pedigree(husband_parent_response["id"], tree)
+
+                else:
+                    return
+                
+            if family_response["wife_id"] != None: 
+            
+                wife_response = result_dict["wife_response"]
+
+                if wife_response["parent_id"] != None:
+
+                    # wife_parent_request = Request_thread(f'{TOP_API_URL}/family/{wife_response["parent_id"]}')
+                    # wife_parent_request.start()
+                    # wife_parent_request.join()
+                    # wife_parent_response = wife_parent_request.get_response()
+
+                    # depth_fs_pedigree(wife_parent_response["id"], tree)
+
+                    # t1 = threading.Thread(target=depth_fs_pedigree, args=(wife_response["parent_id"], tree))
+
+                    # threads.append(t1)
+
+                    # t1.start()
+
+                    # t1.join()
+
+                    executor.submit(depth_fs_pedigree, wife_response["parent_id"], tree)
+
+                else:
+                    return
         
 
+        # for thread in threads:
+        #     thread.join()
 
-
-            # # Recursive call for each child
-            # depth -= 1
-            # depth_fs_pedigree(child, tree)
-            # depth += 1
+      
 
 
 # -----------------------------------------------------------------------------
-def breadth_fs_pedigree(family_id, tree):
+def breadth_fs_pedigree(family_id, tree:Tree):
     # KEEP this function even if you don't implement it
     # TODO - implement breadth first retrieval
     # TODO - Printing out people and families that are retrieved from the server will help debugging
     # level by level traversal
 
-    pass
+    result_dict = {}
+
+    # Initialize a queue with the root
+    q = queue.Queue()
+    q.put(family_id)
+    
+    while not q.empty():
+
+        curr_family = q.get()
+        family_request = Request_thread(f'{TOP_API_URL}/family/{curr_family}')
+        family_request.start()
+        family_request.join()
+        family_response = family_request.get_response()
+
+        if family_response:
+
+            family = Family(family_response)
+            tree.add_family(family)
+
+            children = family_response["children"]
+
+            child_threads = []
+
+            for child in children:
+
+                child_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, child, "child_response", tree))
+                child_thread.start()
+                child_threads.append(child_thread)
+
+            if family_response["husband_id"] != None: 
+
+                husband_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, family_response["husband_id"], "husband_response", tree))
+                husband_thread.start()
+
+            if family_response["wife_id"] != None: 
+            
+                wife_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, family_response["wife_id"], "wife_response", tree))
+                wife_thread.start()
+
+            for thread in child_threads:
+
+                thread.join()
+            
+            if family_response["husband_id"] != None: 
+                husband_thread.join()
+            if family_response["wife_id"] != None: 
+                wife_thread.join()
+
+            husband_response = result_dict["husband_response"]
+
+            if husband_response["parent_id"] != None:
+
+                # husband_parent_request = Request_thread(f'{TOP_API_URL}/family/{husband_response["parent_id"]}')
+                # husband_parent_request.start()
+                # husband_parent_request.join()
+                # husband_parent_response = husband_parent_request.get_response()
+                q.put(husband_response["parent_id"])
+ 
+            wife_response = result_dict["wife_response"]
+
+            if wife_response["parent_id"] != None:
+
+                # wife_parent_request = Request_thread(f'{TOP_API_URL}/family/{wife_response["parent_id"]}')
+                # wife_parent_request.start()
+                # wife_parent_request.join()
+                # wife_parent_response = wife_parent_request.get_response()
+                q.put(wife_response["parent_id"])
+
 
 # -----------------------------------------------------------------------------
 def breadth_fs_pedigree_limit5(family_id, tree):
