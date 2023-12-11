@@ -43,23 +43,44 @@ You will lose 10% if you don't detail your part 1 and part 2 code below
 
 Describe how to speed up part 1
 
-<Add your comments here>
+I sped up part 1 by using recursion to traverse through the tree (DFS) and then I started up a new thread 
+with the ThreadPoolExecutor class that I imported in to manage the threads that were being created recursively.
+I also had a different set of threads running concurrenly when retreiving all of the information on every person
+in each family (threaded_fs function). The run time for this part is around 5 seconds.
 
 
 Describe how to speed up part 2
 
-<Add your comments here>
+I sped up part 2 by using an array that contains arrays which represents each generation and this array
+of arrays acts as a queue for families to be processed. Each family in each generation gets processed concurrently
+and this gets done by starting a new thread for each family in each generation. I made a function named 
+bfs_thread that processes each family and then adds the husband's and wife's parent_id to the next generation
+of the array of arrays. To process each person in the family, I reused the same function that was used 
+in part 1 (threaded_fs) so that each person gets processed concurrently. 
+Unfortunately, this code runs in about 19 seconds because there is a race condition
+when concurrently processing the families.Therefore, a lock was necessary to prevent this race condition but this 
+resulted in the code running slower than desired.
+
 
 
 Extra (Optional) 10% Bonus to speed up part 3
 
 <Add your comments here>
 
+I believe my work on this assignment is a 3/4 since I was able to 
+meet most requirements for this assignment. I used threads for both parts, I used recursion for part 1, I took 
+an iterative approach for part 2 and I was able to retrieve family and person data and add this data to the tree.
+While I was able to run part 1 under 10 seconds (runs in about 5 seconds), I was not able to do the same for 
+part 2 (runs in about 19 seconds).
+
 """
 from common import *
 import threading, queue
 
+
 from concurrent.futures import ThreadPoolExecutor
+
+
 
 threads = []
 
@@ -129,23 +150,7 @@ def depth_fs_pedigree(family_id, tree: Tree):
 
                 if husband_response["parent_id"] != None:
 
-                    # husband_parent_request = Request_thread(f'{TOP_API_URL}/family/{husband_response["parent_id"]}')
-                    # husband_parent_request.start()
-                    # husband_parent_request.join()
-                    # husband_parent_response = husband_parent_request.get_response()
-
-                    # t1 = threading.Thread(target=depth_fs_pedigree, args=(husband_response["parent_id"], tree))
-
-                    # threads.append(t1)
-
-                    # t1.start()
-
-                    # t1.join()
-
                     executor.submit(depth_fs_pedigree, husband_response["parent_id"], tree)
-
-
-                    # depth_fs_pedigree(husband_parent_response["id"], tree)
 
                 else:
                     return
@@ -156,33 +161,86 @@ def depth_fs_pedigree(family_id, tree: Tree):
 
                 if wife_response["parent_id"] != None:
 
-                    # wife_parent_request = Request_thread(f'{TOP_API_URL}/family/{wife_response["parent_id"]}')
-                    # wife_parent_request.start()
-                    # wife_parent_request.join()
-                    # wife_parent_response = wife_parent_request.get_response()
-
-                    # depth_fs_pedigree(wife_parent_response["id"], tree)
-
-                    # t1 = threading.Thread(target=depth_fs_pedigree, args=(wife_response["parent_id"], tree))
-
-                    # threads.append(t1)
-
-                    # t1.start()
-
-                    # t1.join()
-
                     executor.submit(depth_fs_pedigree, wife_response["parent_id"], tree)
 
                 else:
                     return
+
+
+def bfs_thread(tree: Tree, result_dict, q, level, family, lock):
+
+    curr_family = family
+    
+    family_request = Request_thread(f'{TOP_API_URL}/family/{curr_family}')
+
+    lock.acquire()
+    family_request.start()
+    family_request.join()
+    lock.release()
+
+    family_response = family_request.get_response()
+
+    if family_response:
+
+        family2 = Family(family_response)
+        tree.add_family(family2)
+
+        children = family_response["children"]
+        child_threads = []
+
+        for child in children:
+
+            child_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, child, "child_response", tree))
+            child_thread.start()
+            child_threads.append(child_thread)
+
+        if family_response["husband_id"] != None: 
+
+            husband_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, family_response["husband_id"], "husband_response", tree))
+            husband_thread.start()
+
+        if family_response["wife_id"] != None: 
+                
+            wife_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, family_response["wife_id"], "wife_response", tree))
+            wife_thread.start()
+
+        for thread in child_threads:
+
+            thread.join()
+
+        if family_response["husband_id"] != None: 
+
+            husband_thread.join()
+
+        if family_response["wife_id"] != None: 
+
+            wife_thread.join()
+
+    
+        if family_response["husband_id"] != None: 
+                    
+            husband_response = result_dict["husband_response"]
+
+            if husband_response["parent_id"] != None:
+                
+                 if level != 5:
+
+                    # print(f"{curr_family} ADDEDDDEDED {husband_response['parent_id']}")
+
+                    q[level + 1].append(husband_response["parent_id"])
+
+        if family_response["wife_id"] != None: 
+    
+            wife_response = result_dict["wife_response"]
+
+            if wife_response["parent_id"] != None:
+
+                if level != 5:
+                        
+                    # print(f"{curr_family} ADDEDDDEDED {wife_response['parent_id']}")
+                    q[level + 1].append(wife_response["parent_id"])
+
         
-
-        # for thread in threads:
-        #     thread.join()
-
-      
-
-
 # -----------------------------------------------------------------------------
 def breadth_fs_pedigree(family_id, tree:Tree):
     # KEEP this function even if you don't implement it
@@ -192,72 +250,32 @@ def breadth_fs_pedigree(family_id, tree:Tree):
 
     result_dict = {}
 
-    # Initialize a queue with the root
-    q = queue.Queue()
-    q.put(family_id)
-    
-    while not q.empty():
+    lock = threading.Lock()
 
-        curr_family = q.get()
-        family_request = Request_thread(f'{TOP_API_URL}/family/{curr_family}')
-        family_request.start()
-        family_request.join()
-        family_response = family_request.get_response()
+    # Initialize a queue (which is an array of arrays in this case) with the root
+    q = [[family_id], [], [], [], [], []]
 
-        if family_response:
+    level = 0
 
-            family = Family(family_response)
-            tree.add_family(family)
+    while level != 6:
 
-            children = family_response["children"]
+        threads = []
 
-            child_threads = []
+        for family in q[level]:
 
-            for child in children:
+            # print(f"FAMILY     jcnnodinjiod {family}")
+            t1 = threading.Thread(target=bfs_thread, args=(tree, result_dict, q, level, family, lock))
+            threads.append(t1)
+        
+        for thread in threads:
 
-                child_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, child, "child_response", tree))
-                child_thread.start()
-                child_threads.append(child_thread)
+            thread.start()
+           
+        for thread in threads:
 
-            if family_response["husband_id"] != None: 
+            thread.join()
 
-                husband_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, family_response["husband_id"], "husband_response", tree))
-                husband_thread.start()
-
-            if family_response["wife_id"] != None: 
-            
-                wife_thread = threading.Thread(target=threaded_fs, args=(family_response, result_dict, family_response["wife_id"], "wife_response", tree))
-                wife_thread.start()
-
-            for thread in child_threads:
-
-                thread.join()
-            
-            if family_response["husband_id"] != None: 
-                husband_thread.join()
-            if family_response["wife_id"] != None: 
-                wife_thread.join()
-
-            husband_response = result_dict["husband_response"]
-
-            if husband_response["parent_id"] != None:
-
-                # husband_parent_request = Request_thread(f'{TOP_API_URL}/family/{husband_response["parent_id"]}')
-                # husband_parent_request.start()
-                # husband_parent_request.join()
-                # husband_parent_response = husband_parent_request.get_response()
-                q.put(husband_response["parent_id"])
- 
-            wife_response = result_dict["wife_response"]
-
-            if wife_response["parent_id"] != None:
-
-                # wife_parent_request = Request_thread(f'{TOP_API_URL}/family/{wife_response["parent_id"]}')
-                # wife_parent_request.start()
-                # wife_parent_request.join()
-                # wife_parent_response = wife_parent_request.get_response()
-                q.put(wife_response["parent_id"])
-
+        level += 1
 
 # -----------------------------------------------------------------------------
 def breadth_fs_pedigree_limit5(family_id, tree):
